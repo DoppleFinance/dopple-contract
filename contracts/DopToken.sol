@@ -1,3 +1,7 @@
+/**
+ *Submitted for verification at BscScan.com on 2021-03-26
+*/
+
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0 <0.8.0;
 
@@ -410,9 +414,9 @@ contract ERC20 is Context, IERC20 {
 
     uint256 private _totalSupply;
 
-    string private _name;
-    string private _symbol;
-    uint8 private _decimals;
+    string public name;
+    string public symbol;
+    uint8 public decimals;
 
     /**
      * @dev Sets the values for {name} and {symbol}, initializes {decimals} with
@@ -423,42 +427,10 @@ contract ERC20 is Context, IERC20 {
      * All three of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor (string memory name_, string memory symbol_) public {
-        _name = name_;
-        _symbol = symbol_;
-        _decimals = 18;
-    }
-
-    /**
-     * @dev Returns the name of the token.
-     */
-    function name() public view virtual returns (string memory) {
-        return _name;
-    }
-
-    /**
-     * @dev Returns the symbol of the token, usually a shorter version of the
-     * name.
-     */
-    function symbol() public view virtual returns (string memory) {
-        return _symbol;
-    }
-
-    /**
-     * @dev Returns the number of decimals used to get its user representation.
-     * For example, if `decimals` equals `2`, a balance of `505` tokens should
-     * be displayed to a user as `5,05` (`505 / 10 ** 2`).
-     *
-     * Tokens usually opt for a value of 18, imitating the relationship between
-     * Ether and Wei. This is the value {ERC20} uses, unless {_setupDecimals} is
-     * called.
-     *
-     * NOTE: This information is only used for _display_ purposes: it in
-     * no way affects any of the arithmetic of the contract, including
-     * {IERC20-balanceOf} and {IERC20-transfer}.
-     */
-    function decimals() public view virtual returns (uint8) {
-        return _decimals;
+    constructor (string memory _name, string memory _symbol) public {
+        name = _name;
+        symbol = _symbol;
+        decimals = 18;
     }
 
     /**
@@ -655,8 +627,8 @@ contract ERC20 is Context, IERC20 {
      * applications that interact with token contracts will not expect
      * {decimals} to ever change, and may work incorrectly if it does.
      */
-    function _setupDecimals(uint8 decimals_) internal virtual {
-        _decimals = decimals_;
+    function _setupDecimals(uint8 _decimals) internal virtual {
+        decimals = _decimals;
     }
 
     /**
@@ -680,14 +652,16 @@ pragma solidity 0.6.6;
 
 // DoppleToken with Governance.
 contract DoppleToken is ERC20("Dopple Token", "DOP"), Ownable {
-  uint256 private _cap = 100000000e18; //100M
-  uint256 private _totalLock;
+
+  uint256 public constant CAP = 100000000e18; //100M
+  uint256 public totalLock;
+
 
   uint256 public startReleaseBlock;
   uint256 public endReleaseBlock;
-  uint256 public manualMintLimit = 6000000e18; //6M
-  uint256 public manualMinted = 0;
-
+  uint256 public constant MANUAL_MINT_LIMIT = 6000000e18; //6M
+  uint256 public manualMinted;
+ 
   mapping(address => uint256) private _locks;
   mapping(address => uint256) private _lastUnlockBlock;
 
@@ -695,7 +669,8 @@ contract DoppleToken is ERC20("Dopple Token", "DOP"), Ownable {
 
   constructor(uint256 _startReleaseBlock, uint256 _endReleaseBlock) public {
     require(_endReleaseBlock > _startReleaseBlock, "endReleaseBlock < startReleaseBlock");
-    _setupDecimals(18);
+    require(_startReleaseBlock > block.number, "startReleaseBlock > block.number");
+
     startReleaseBlock = _startReleaseBlock;
     endReleaseBlock = _endReleaseBlock;
 
@@ -709,56 +684,68 @@ contract DoppleToken is ERC20("Dopple Token", "DOP"), Ownable {
     endReleaseBlock = _endReleaseBlock;
   }
 
-  function cap() public view returns (uint256) {
-    return _cap;
-  }
-
   function unlockedSupply() public view returns (uint256) {
-    return totalSupply().sub(totalLock());
-  }
-
-  function totalLock() public view returns (uint256) {
-    return _totalLock;
+    return totalSupply().sub(totalLock);
   }
 
   function manualMint(address _to, uint256 _amount) public onlyOwner {
-    require(manualMinted <= manualMintLimit, "mint limit exceeded");
+    require(manualMinted.add(_amount) <= MANUAL_MINT_LIMIT, "mint limit exceeded");
+    manualMinted = manualMinted.add(_amount);
+    require(manualMinted <= CAP, "manual mint exceeded CAP");
+
     mint(_to, _amount);
   }
 
   function mint(address _to, uint256 _amount) public onlyOwner {
-    require(totalSupply().add(_amount) <= cap(), "cap exceeded");
+    require(totalSupply().add(_amount) <= CAP, "cap exceeded");
     _mint(_to, _amount);
     _moveDelegates(address(0), _delegates[_to], _amount);
   }
 
-  function burn(address _account, uint256 _amount) public onlyOwner {
+  function burn(address _account, uint256 _amount) external onlyOwner {
     _burn(_account, _amount);
   }
 
-  function totalBalanceOf(address _account) public view returns (uint256) {
+  function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
+    _transfer(_msgSender(), recipient, amount);
+    _moveDelegates(_delegates[_msgSender()], _delegates[recipient], amount);
+    return true;
+  }
+
+  function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
+    _transfer(sender, recipient, amount);
+    _approve(sender, _msgSender(), allowance(sender, _msgSender()).sub(amount, "ERC20: transfer amount exceeds allowance"));
+    _moveDelegates(_delegates[sender], _delegates[recipient], amount);
+    return true;
+  }
+
+  function totalBalanceOf(address _account) external view returns (uint256) {
     return _locks[_account].add(balanceOf(_account));
   }
 
-  function lockOf(address _account) public view returns (uint256) {
+  function lockOf(address _account) external view returns (uint256) {
     return _locks[_account];
   }
 
-  function lastUnlockBlock(address _account) public view returns (uint256) {
+  function lastUnlockBlock(address _account) external view returns (uint256) {
     return _lastUnlockBlock[_account];
   }
 
-  function lock(address _account, uint256 _amount) public onlyOwner {
+  function lock(address _account, uint256 _amount) external onlyOwner {
     require(_account != address(0), "no lock to address(0)");
     require(_amount <= balanceOf(_account), "no lock over balance");
+    require(endReleaseBlock > block.number, "no lock happen after endReleaseBlock has elaped");
 
     _transfer(_account, address(this), _amount);
+    _moveDelegates(_delegates[_account], _delegates[address(this)], _amount);
 
     _locks[_account] = _locks[_account].add(_amount);
-    _totalLock = _totalLock.add(_amount);
+    totalLock = totalLock.add(_amount);
 
-    if (_lastUnlockBlock[_account] < startReleaseBlock) {
-      _lastUnlockBlock[_account] = startReleaseBlock;
+
+    uint256 _startReleaseBlock = startReleaseBlock;
+    if (_lastUnlockBlock[_account] < _startReleaseBlock) {
+      _lastUnlockBlock[_account] = _startReleaseBlock;
     }
 
     emit Lock(_account, _amount);
@@ -777,25 +764,31 @@ contract DoppleToken is ERC20("Dopple Token", "DOP"), Ownable {
     // some DOPPLEs can be released
     else
     {
-      uint256 releasedBlock = block.number.sub(_lastUnlockBlock[_account]);
-      uint256 blockLeft = endReleaseBlock.sub(_lastUnlockBlock[_account]);
+      uint256 myLastUnlockBlock = _lastUnlockBlock[_account];
+      uint256 releasedBlock = block.number.sub(myLastUnlockBlock);
+      uint256 blockLeft = endReleaseBlock.sub(myLastUnlockBlock);
       return _locks[_account].mul(releasedBlock).div(blockLeft);
     }
   }
 
-  function unlock() public {
+  function unlock() external {
     require(_locks[msg.sender] > 0, "no locked DOPPLEs");
 
     uint256 amount = canUnlockAmount(msg.sender);
 
+    require(amount != 0, "unlock amount should not be ZERO");
+
     _transfer(address(this), msg.sender, amount);
+    _moveDelegates(_delegates[address(this)], _delegates[msg.sender], amount);
     _locks[msg.sender] = _locks[msg.sender].sub(amount);
     _lastUnlockBlock[msg.sender] = block.number;
-    _totalLock = _totalLock.sub(amount);
+    totalLock = totalLock.sub(amount);
   }
 
   // @dev move DOPPLEs with its locked funds to another account
-  function transferAll(address _to) public {
+  function transferAll(address _to) external {
+    require(msg.sender != _to, "no self-transferAll");
+
     _locks[_to] = _locks[_to].add(_locks[msg.sender]);
 
     if (_lastUnlockBlock[_to] < startReleaseBlock) {
@@ -809,7 +802,9 @@ contract DoppleToken is ERC20("Dopple Token", "DOP"), Ownable {
     _locks[msg.sender] = 0;
     _lastUnlockBlock[msg.sender] = 0;
 
-    _transfer(msg.sender, _to, balanceOf(msg.sender));
+    uint256 _amount = balanceOf(msg.sender);
+    _transfer(msg.sender, _to, _amount);
+    _moveDelegates(_delegates[msg.sender], _delegates[_to], _amount);
   }
 
   // Copied and modified from YAM code:
@@ -886,7 +881,7 @@ contract DoppleToken is ERC20("Dopple Token", "DOP"), Ownable {
     bytes32 s
   ) external {
     bytes32 domainSeparator = keccak256(
-      abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name())), getChainId(), address(this))
+      abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this))
     );
 
     bytes32 structHash = keccak256(abi.encode(DELEGATION_TYPEHASH, delegatee, nonce, expiry));
@@ -1008,11 +1003,9 @@ contract DoppleToken is ERC20("Dopple Token", "DOP"), Ownable {
     return uint32(n);
   }
 
-  function getChainId() internal pure returns (uint256) {
-    uint256 chainId;
+  function getChainId() internal pure returns (uint256 chainId) {
     assembly {
       chainId := chainid()
     }
-    return chainId;
   }
 }

@@ -1,4 +1,64 @@
 pragma solidity 0.6.6;
+
+/**
+ * @dev Contract module that helps prevent reentrant calls to a function.
+ *
+ * Inheriting from `ReentrancyGuard` will make the {nonReentrant} modifier
+ * available, which can be applied to functions to make sure there are no nested
+ * (reentrant) calls to them.
+ *
+ * Note that because there is a single `nonReentrant` guard, functions marked as
+ * `nonReentrant` may not call one another. This can be worked around by making
+ * those functions `private`, and then adding `external` `nonReentrant` entry
+ * points to them.
+ *
+ * TIP: If you would like to learn more about reentrancy and alternative ways
+ * to protect against it, check out our blog post
+ * https://blog.openzeppelin.com/reentrancy-after-istanbul/[Reentrancy After Istanbul].
+ */
+abstract contract ReentrancyGuard {
+    // Booleans are more expensive than uint256 or any type that takes up a full
+    // word because each write operation emits an extra SLOAD to first read the
+    // slot's contents, replace the bits taken up by the boolean, and then write
+    // back. This is the compiler's defense against contract upgrades and
+    // pointer aliasing, and it cannot be disabled.
+
+    // The values being non-zero value makes deployment a bit more expensive,
+    // but in exchange the refund on every call to nonReentrant will be lower in
+    // amount. Since refunds are capped to a percentage of the total
+    // transaction's gas, it is best to keep them low in cases like this one, to
+    // increase the likelihood of the full refund coming into effect.
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
+
+    uint256 private _status;
+
+    constructor() internal {
+        _status = _NOT_ENTERED;
+    }
+
+    /**
+     * @dev Prevents a contract from calling itself, directly or indirectly.
+     * Calling a `nonReentrant` function from another `nonReentrant`
+     * function is not supported. It is possible to prevent this from happening
+     * by making the `nonReentrant` function external, and make it call a
+     * `private` function that does the actual work.
+     */
+    modifier nonReentrant() {
+        // On the first call to nonReentrant, _notEntered will be true
+        require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
+
+        // Any calls to nonReentrant after this point will fail
+        _status = _ENTERED;
+
+        _;
+
+        // By storing the original value once again, a refund is triggered (see
+        // https://eips.ethereum.org/EIPS/eip-2200)
+        _status = _NOT_ENTERED;
+    }
+}
+
 interface IERC20 {
     /**
      * @dev Returns the amount of tokens in existence.
@@ -1272,7 +1332,7 @@ interface IFairLaunch {
 }
 
 // FairLaunch is a smart contract for distributing DOPPLE by asking user to stake the ERC20-based token.
-contract FairLaunch is IFairLaunch, Ownable {
+contract FairLaunch is IFairLaunch, Ownable, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
@@ -1363,7 +1423,7 @@ contract FairLaunch is IFairLaunch, Ownable {
     devaddr = _devaddr;
   }
 
-  function setDopplePerBlock(uint256 _dopplePerBlock) public onlyOwner {
+  function setDopplePerBlock(uint256 _dopplePerBlock) external onlyOwner {
     dopplePerBlock = _dopplePerBlock;
   }
 
@@ -1373,7 +1433,7 @@ contract FairLaunch is IFairLaunch, Ownable {
     uint256 _bonusMultiplier,
     uint256 _bonusEndBlock,
     uint256 _bonusLockUpBps
-  ) public onlyOwner {
+  ) external onlyOwner {
     require(_bonusEndBlock > block.number, "setBonus: bad bonusEndBlock");
     require(_bonusMultiplier > 1, "setBonus: bad bonusMultiplier");
     bonusMultiplier = _bonusMultiplier;
@@ -1386,7 +1446,7 @@ contract FairLaunch is IFairLaunch, Ownable {
     uint256 _allocPoint,
     address _stakeToken,
     bool _withUpdate
-  ) public override onlyOwner {
+  ) external override onlyOwner {
     if (_withUpdate) {
       massUpdatePools();
     }
@@ -1409,11 +1469,9 @@ contract FairLaunch is IFairLaunch, Ownable {
   function setPool(
     uint256 _pid,
     uint256 _allocPoint,
-    bool _withUpdate
-  ) public override onlyOwner {
-    if (_withUpdate) {
-      massUpdatePools();
-    }
+    bool /* _withUpdate */
+  ) external override onlyOwner {
+    massUpdatePools();
     totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
     poolInfo[_pid].allocPoint = _allocPoint;
   }
@@ -1439,7 +1497,7 @@ contract FairLaunch is IFairLaunch, Ownable {
     return poolInfo.length;
   }
 
-  function manualMint(address _to, uint256 _amount) public onlyOwner {
+  function manualMint(address _to, uint256 _amount) external onlyOwner {
     dopple.manualMint(_to, _amount);
   }
 
@@ -1495,19 +1553,19 @@ contract FairLaunch is IFairLaunch, Ownable {
     pool.accDopplePerShare = pool.accDopplePerShare.add(doppleReward.mul(1e12).div(lpSupply));
     // update accDopplePerShareTilBonusEnd
     if (block.number <= bonusEndBlock) {
-      dopple.lock(devaddr, doppleReward.div(10).mul(bonusLockUpBps).div(10000));
+      dopple.lock(devaddr, doppleReward.mul(bonusLockUpBps).div(100000));
       pool.accDopplePerShareTilBonusEnd = pool.accDopplePerShare;
     }
     if(block.number > bonusEndBlock && pool.lastRewardBlock < bonusEndBlock) {
       uint256 doppleBonusPortion = bonusEndBlock.sub(pool.lastRewardBlock).mul(bonusMultiplier).mul(dopplePerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-      dopple.lock(devaddr, doppleBonusPortion.div(10).mul(bonusLockUpBps).div(10000));
+      dopple.lock(devaddr, doppleBonusPortion.mul(bonusLockUpBps).div(100000));
       pool.accDopplePerShareTilBonusEnd = pool.accDopplePerShareTilBonusEnd.add(doppleBonusPortion.mul(1e12).div(lpSupply));
     }
     pool.lastRewardBlock = block.number;
   }
 
   // Deposit Staking tokens to FairLaunchToken for DOPPLE allocation.
-  function deposit(address _for, uint256 _pid, uint256 _amount) public override {
+  function deposit(address _for, uint256 _pid, uint256 _amount) external override nonReentrant {
     PoolInfo storage pool = poolInfo[_pid];
     UserInfo storage user = userInfo[_pid][_for];
     if (user.fundedBy != address(0)) require(user.fundedBy == msg.sender, "bad sof");
@@ -1523,11 +1581,11 @@ contract FairLaunch is IFairLaunch, Ownable {
   }
 
   // Withdraw Staking tokens from FairLaunchToken.
-  function withdraw(address _for, uint256 _pid, uint256 _amount) public override {
+  function withdraw(address _for, uint256 _pid, uint256 _amount) external override nonReentrant {
     _withdraw(_for, _pid, _amount);
   }
 
-  function withdrawAll(address _for, uint256 _pid) public override {
+  function withdrawAll(address _for, uint256 _pid) external override nonReentrant {
     _withdraw(_for, _pid, userInfo[_pid][_for].amount);
   }
 
@@ -1541,6 +1599,7 @@ contract FairLaunch is IFairLaunch, Ownable {
     user.amount = user.amount.sub(_amount);
     user.rewardDebt = user.amount.mul(pool.accDopplePerShare).div(1e12);
     user.bonusDebt = user.amount.mul(pool.accDopplePerShareTilBonusEnd).div(1e12);
+    if (user.amount == 0) user.fundedBy = address(0);
     if (pool.stakeToken != address(0)) {
       IERC20(pool.stakeToken).safeTransfer(address(msg.sender), _amount);
     }
@@ -1548,7 +1607,7 @@ contract FairLaunch is IFairLaunch, Ownable {
   }
 
   // Harvest DOPPLEs earn from the pool.
-  function harvest(uint256 _pid) public override {
+  function harvest(uint256 _pid) external override nonReentrant {
     PoolInfo storage pool = poolInfo[_pid];
     UserInfo storage user = userInfo[_pid][msg.sender];
     updatePool(_pid);
@@ -1569,22 +1628,24 @@ contract FairLaunch is IFairLaunch, Ownable {
   }
 
   // Withdraw without caring about rewards. EMERGENCY ONLY.
-  function emergencyWithdraw(uint256 _pid) public {
+  function emergencyWithdraw(uint256 _pid) external nonReentrant {
     PoolInfo storage pool = poolInfo[_pid];
     UserInfo storage user = userInfo[_pid][msg.sender];
+    require(user.fundedBy == msg.sender, "only funder");
     IERC20(pool.stakeToken).safeTransfer(address(msg.sender), user.amount);
     emit EmergencyWithdraw(msg.sender, _pid, user.amount);
     user.amount = 0;
     user.rewardDebt = 0;
+    user.fundedBy = address(0);
   }
 
     // Safe dopple transfer function, just in case if rounding error causes pool to not have enough DOPPLEs.
   function safeDoppleTransfer(address _to, uint256 _amount) internal {
     uint256 doppleBal = dopple.balanceOf(address(this));
     if (_amount > doppleBal) {
-      dopple.transfer(_to, doppleBal);
+      require(dopple.transfer(_to, doppleBal), "failed to transfer DOPPLE");
     } else {
-      dopple.transfer(_to, _amount);
+      require(dopple.transfer(_to, _amount), "failed to transfer DOPPLE");
     }
   }
 

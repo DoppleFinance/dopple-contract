@@ -447,22 +447,21 @@ library SwapUtils {
      * the amounts in the balances array. When multiplied together they
      * should yield amounts at the pool's precision.
      *
-     * @return an array of amounts "scaled" to the pool's precision
+     * @return xp an array of amounts "scaled" to the pool's precision
      */
     function _xp(
         uint256[] memory balances,
         uint256[] memory precisionMultipliers
-    ) internal pure returns (uint256[] memory) {
+    ) internal pure returns (uint256[] memory xp) {
         uint256 numTokens = balances.length;
         require(
             numTokens == precisionMultipliers.length,
             "Balances must match multipliers"
         );
-        uint256[] memory xp = new uint256[](numTokens);
+        xp = new uint256[](numTokens);
         for (uint256 i = 0; i < numTokens; i++) {
             xp[i] = balances[i].mul(precisionMultipliers[i]);
         }
-        return xp;
     }
 
     /**
@@ -651,7 +650,7 @@ library SwapUtils {
         Swap storage self,
         address account,
         uint256 amount
-    ) internal view returns (uint256[] memory) {
+    ) internal view returns (uint256[] memory accounts) {
         uint256 totalSupply = self.lpToken.totalSupply();
         require(amount <= totalSupply, "Cannot exceed total supply");
 
@@ -662,14 +661,13 @@ library SwapUtils {
             )
                 .div(FEE_DENOMINATOR);
 
-        uint256[] memory amounts = new uint256[](self.pooledTokens.length);
+        amounts = new uint256[](self.pooledTokens.length);
 
         for (uint256 i = 0; i < self.pooledTokens.length; i++) {
             amounts[i] = self.balances[i].mul(feeAdjustedAmount).div(
                 totalSupply
             );
         }
-        return amounts;
     }
 
     /**
@@ -854,13 +852,13 @@ library SwapUtils {
      * @param minToMint the minimum LP tokens adding this amount of liquidity
      * should mint, otherwise revert. Handy for front-running mitigation
      * allowed addresses. If the pool is not in the guarded launch phase, this parameter will be ignored.
-     * @return amount of LP token user received
+     * @return toMint amount of LP token user received
      */
     function addLiquidity(
         Swap storage self,
         uint256[] memory amounts,
         uint256 minToMint
-    ) external returns (uint256) {
+    ) external returns (uint256 toMint) {
         require(
             amounts.length == self.pooledTokens.length,
             "Amounts must match pooled tokens"
@@ -927,7 +925,6 @@ library SwapUtils {
             self.balances = newBalances;
         }
 
-        uint256 toMint;
         if (totalSupply == 0) {
             toMint = v.d1;
         } else {
@@ -946,8 +943,6 @@ library SwapUtils {
             v.d1,
             totalSupply.add(toMint)
         );
-
-        return toMint;
     }
 
     /**
@@ -1009,15 +1004,14 @@ library SwapUtils {
         Swap storage self,
         uint256 amount,
         uint256[] calldata minAmounts
-    ) external returns (uint256[] memory) {
+    ) external returns (uint256[] memory amounts) {
         require(amount <= self.lpToken.balanceOf(msg.sender), ">LP.balanceOf");
         require(
             minAmounts.length == self.pooledTokens.length,
             "minAmounts must match poolTokens"
         );
 
-        uint256[] memory amounts =
-            _calculateRemoveLiquidity(self, msg.sender, amount);
+        amounts = _calculateRemoveLiquidity(self, msg.sender, amount);
 
         for (uint256 i = 0; i < amounts.length; i++) {
             require(amounts[i] >= minAmounts[i], "amounts[i] < minAmounts[i]");
@@ -1029,7 +1023,6 @@ library SwapUtils {
 
         emit RemoveLiquidity(msg.sender, amounts, self.lpToken.totalSupply());
 
-        return amounts;
     }
 
     /**
@@ -1038,14 +1031,14 @@ library SwapUtils {
      * @param tokenAmount the amount of the lp tokens to burn
      * @param tokenIndex the index of the token you want to receive
      * @param minAmount the minimum amount to withdraw, otherwise revert
-     * @return amount chosen token that user received
+     * @return dy amount chosen token that user received
      */
     function removeLiquidityOneToken(
         Swap storage self,
         uint256 tokenAmount,
         uint8 tokenIndex,
         uint256 minAmount
-    ) external returns (uint256) {
+    ) external returns (uint256 dy) {
         uint256 totalSupply = self.lpToken.totalSupply();
         uint256 numTokens = self.pooledTokens.length;
         require(
@@ -1055,7 +1048,6 @@ library SwapUtils {
         require(tokenIndex < numTokens, "Token not found");
 
         uint256 dyFee;
-        uint256 dy;
 
         (dy, dyFee) = calculateWithdrawOneToken(
             self,
@@ -1079,8 +1071,6 @@ library SwapUtils {
             tokenIndex,
             dy
         );
-
-        return dy;
     }
 
     /**
@@ -1091,13 +1081,13 @@ library SwapUtils {
      * @param amounts how much of each token to withdraw
      * @param maxBurnAmount the max LP token provider is willing to pay to
      * remove liquidity. Useful as a front-running mitigation.
-     * @return actual amount of LP tokens burned in the withdrawal
+     * @return tokenAmount actual amount of LP tokens burned in the withdrawal
      */
     function removeLiquidityImbalance(
         Swap storage self,
         uint256[] memory amounts,
         uint256 maxBurnAmount
-    ) public returns (uint256) {
+    ) public returns (uint256 tokenAmount) {
         require(
             amounts.length == self.pooledTokens.length,
             "Amounts should match pool tokens"
@@ -1139,7 +1129,7 @@ library SwapUtils {
 
         v.d2 = getD(_xp(self, balances1), v.preciseA);
 
-        uint256 tokenAmount = v.d0.sub(v.d2).mul(tokenSupply).div(v.d0);
+        tokenAmount = v.d0.sub(v.d2).mul(tokenSupply).div(v.d0);
         require(tokenAmount != 0, "Burnt amount cannot be zero");
         tokenAmount = tokenAmount.add(1).mul(FEE_DENOMINATOR).div(
             FEE_DENOMINATOR.sub(calculateCurrentWithdrawFee(self, msg.sender))
@@ -1161,7 +1151,6 @@ library SwapUtils {
             tokenSupply.sub(tokenAmount)
         );
 
-        return tokenAmount;
     }
 
     /**

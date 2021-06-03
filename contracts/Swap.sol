@@ -36,9 +36,6 @@ contract Swap is OwnerPausableUpgradeable, ReentrancyGuardUpgradeable {
     // access this data, this contract uses SwapUtils library. For more details, see SwapUtils.sol
     SwapUtils.Swap public swapStorage;
 
-    // True if the contract is initialized.
-    bool private initialized = false;
-
     // Maps token address to an index in the pool. Used to prevent duplicate tokens in the pool.
     // getTokenIndex function also relies on this mapping to retrieve token index.
     mapping(address => uint8) private tokenIndexes;
@@ -130,7 +127,7 @@ contract Swap is OwnerPausableUpgradeable, ReentrancyGuardUpgradeable {
 
         uint256[] memory precisionMultipliers = new uint256[](decimals.length);
 
-        for (uint8 i = 0; i < _pooledTokens.length; i++) {
+        for (uint256 i = 0; i < _pooledTokens.length; i++) {
             if (i > 0) {
                 // Check if index is already used. Check if 0th element is a duplicate.
                 require(
@@ -232,13 +229,12 @@ contract Swap is OwnerPausableUpgradeable, ReentrancyGuardUpgradeable {
      * @param tokenAddress address of the token
      * @return the index of the given token address
      */
-    function getTokenIndex(address tokenAddress) public view returns (uint8) {
-        uint8 index = tokenIndexes[tokenAddress];
+    function getTokenIndex(address tokenAddress) public view returns (uint8 index) {
+        index = tokenIndexes[tokenAddress];
         require(
             address(getToken(index)) == tokenAddress,
             "Token does not exist"
         );
-        return index;
     }
 
     /**
