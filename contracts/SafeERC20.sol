@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.6.6;
+pragma solidity 0.6.6;
 
 import "./IERC20.sol";
 import "../../math/SafeMath.sol";

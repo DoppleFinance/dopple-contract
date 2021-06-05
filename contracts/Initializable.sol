@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 // solhint-disable-next-line compiler-version
-pragma solidity ^0.6.6;
+pragma solidity 0.6.6;
 
 import "../utils/AddressUpgradeable.sol";
 
