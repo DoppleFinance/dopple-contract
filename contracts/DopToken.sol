@@ -694,6 +694,7 @@ contract DoppleToken is ERC20("Dopple Token", "DOP"), Ownable {
     require(manualMinted <= CAP, "manual mint exceeded CAP");
 
     mint(_to, _amount);
+    _moveDelegates(address(0), _delegates[_to], _amount);
   }
 
   function mint(address _to, uint256 _amount) public onlyOwner {
