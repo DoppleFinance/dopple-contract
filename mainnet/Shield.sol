@@ -13,7 +13,7 @@ contract Shield is Ownable {
   uint256 public mintLimit = 6000000e18;
   uint256 public mintCount = 610000e18;
 
-  event SetDopplePerBlock(uint256 indexed _alpacaPerBlock);
+  event SetDopplePerBlock(uint256 indexed _dopplePerBlock);
   event SetBonus(uint256 _bonusMultiplier, uint256 _bonusEndBlock, uint256 _bonusLockUpBps);
   event MintWarchest(address indexed _to, uint256 _amount);
   event AddPool(uint256 indexed _pid, uint256 _allocPoint, address indexed _stakeToken);
@@ -26,10 +26,10 @@ contract Shield is Ownable {
   }
 
   /// @dev Set DOPPLE per Block on FLV1. Effect immediately on the next block.
-  /// @param _alpacaPerBlock The new alpacaPerBlock
-  function setDopplePerBlock(uint256 _alpacaPerBlock) public onlyOwner {
-    fairLaunchV1.setDopplePerBlock(_alpacaPerBlock);
-    emit SetDopplePerBlock(_alpacaPerBlock);
+  /// @param _dopplePerBlock The new dopplePerBlock
+  function setDopplePerBlock(uint256 _dopplePerBlock) public onlyOwner {
+    fairLaunchV1.setDopplePerBlock(_dopplePerBlock);
+    emit SetDopplePerBlock(_dopplePerBlock);
   }
 
   /// @dev Set Bonus period on FLV1. This shouldn't be used much. Better use FLV2
