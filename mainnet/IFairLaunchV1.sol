@@ -13,8 +13,8 @@ interface IFairLaunchV1 {
     address stakeToken;
     uint256 allocPoint;
     uint256 lastRewardBlock;
-    uint256 accAlpacaPerShare;
-    uint256 accAlpacaPerShareTilBonusEnd;
+    uint256 accDopplePerShare;
+    uint256 accDopplePerShareTilBonusEnd;
   }
 
   // Information query functions
@@ -25,17 +25,19 @@ interface IFairLaunchV1 {
   function poolLength() external view returns (uint256);
 
   // OnlyOwner functions
-  function setAlpacaPerBlock(uint256 _dopplePerBlock) external;
+  function setDopplePerBlock(uint256 _dopplePerBlock) external;
   function setBonus(uint256 _bonusMultiplier, uint256 _bonusEndBlock, uint256 _bonusLockUpBps) external;
   function manualMint(address _to, uint256 _amount) external;
   function addPool(uint256 _allocPoint, address _stakeToken, bool _withUpdate) external;
   function setPool(uint256 _pid, uint256 _allocPoint, bool _withUpdate) external;
 
   // User's interaction functions
-  function pendingAlpaca(uint256 _pid, address _user) external view returns (uint256);
+  function pendingDopple(uint256 _pid, address _user) external view returns (uint256);
   function updatePool(uint256 _pid) external;
   function deposit(address _for, uint256 _pid, uint256 _amount) external;
   function withdraw(address _for, uint256 _pid, uint256 _amount) external;
   function withdrawAll(address _for, uint256 _pid) external;
   function harvest(uint256 _pid) external;
+
+  function transferOwnership(address newOwner) external;
 }
