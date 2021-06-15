@@ -11,7 +11,7 @@ contract Shield is Ownable {
   IFairLaunchV1 public fairLaunchV1;
 
   uint256 public mintLimit = 6000000e18;
-  uint256 public mintCount = 600000e18;
+  uint256 public mintCount = 610000e18;
 
   event SetDopplePerBlock(uint256 indexed _alpacaPerBlock);
   event SetBonus(uint256 _bonusMultiplier, uint256 _bonusEndBlock, uint256 _bonusLockUpBps);
