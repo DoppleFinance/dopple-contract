@@ -1,7 +1,7 @@
 const { expect, assert } = require('chai');
 const { getNamedAccounts, ethers } = require('hardhat');
 
-describe('Mint', async () => {
+describe('Using Shield contract for fixing the unlimited minting issue', async () => {
   let deployer;
 
   before(async () => {
@@ -19,11 +19,13 @@ describe('Mint', async () => {
     result = await DoppleToken.transferOwnership(FairLaunch.address);
     const doppleOwner = await DoppleToken.owner();
     expect(doppleOwner).eq(FairLaunch.address);
+
     const oldBalance = await DoppleToken.balanceOf(deployer);
     console.log('oldBalance', ethers.utils.formatEther(oldBalance));
     const mintAmount = ethers.utils.parseEther('600000');
     result = await FairLaunch.manualMint(deployer, mintAmount);
     assert.ok(result);
+
     const newBalance = await DoppleToken.balanceOf(deployer);
     console.log('newBalance', ethers.utils.formatEther(newBalance));
     expect(newBalance).eq(oldBalance.add(mintAmount));
@@ -77,13 +79,14 @@ describe('Mint', async () => {
   it('Can manualMint equal the limit', async () => {
     const DoppleToken = await ethers.getContract('DoppleToken');
     const Shield = await ethers.getContract('Shield');
-    let result;
     const oldBalance = await DoppleToken.balanceOf(deployer);
     console.log('oldBalance', ethers.utils.formatEther(oldBalance));
     const mintLimit = await Shield.mintLimit();
     const mintCount = await Shield.mintCount();
     const mintRemaining = mintLimit.sub(mintCount);
-    result = await Shield.mintWarchest(deployer, mintRemaining);
+    const result = await Shield.mintWarchest(deployer, mintRemaining);
+    assert.ok(result);
+
     const newBalance = await DoppleToken.balanceOf(deployer);
     console.log('newBalance', ethers.utils.formatEther(newBalance));
     expect(newBalance).eq(mintLimit);
@@ -172,7 +175,7 @@ describe('Mint', async () => {
     expect(newOwner).eq(deployer);
   });
 
-  it('Can not call FairLaunch by Shield', async () => {
+  it('Can not call FairLaunch methods by Shield', async () => {
     const Shield = await ethers.getContract('Shield');
     try {
       await Shield.transferFairLaunchOwnership(deployer);
