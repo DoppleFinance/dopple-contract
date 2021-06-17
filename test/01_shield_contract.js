@@ -97,12 +97,14 @@ describe('Using Shield contract for fixing the unlimited minting issue', async (
     const mintLimit = await Shield.mintLimit();
     const mintCount = await Shield.mintCount();
     const mintRemaining = mintLimit.sub(mintCount).add(1); // add 1 wei
+    let result;
     try {
-      await Shield.mintWarchest(deployer, mintRemaining);
+      result = await Shield.mintWarchest(deployer, mintRemaining);
     } catch (err) {
       // error means reverted
       assert.ok(err);
     }
+    assert.ok(!result);
   });
 
   it('Can set dopple per block by Shield', async () => {
@@ -177,10 +179,12 @@ describe('Using Shield contract for fixing the unlimited minting issue', async (
 
   it('Can not call FairLaunch methods by Shield', async () => {
     const Shield = await ethers.getContract('Shield');
+    let result
     try {
-      await Shield.transferFairLaunchOwnership(deployer);
+      result = await Shield.transferFairLaunchOwnership(deployer);
     } catch (err) {
       assert.ok(err);
     }
+    assert.ok(!result);
   });
 });
